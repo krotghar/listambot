@@ -34,7 +34,7 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0",
     "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.136 Mobile Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:118.0) Gecko/20100101 Firefox/118.0",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_7_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Safari/605.1.15"
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_7_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.3 Safari/605.1.15",
 ]
 
 ACCEPT_LANGUAGES = [
@@ -48,6 +48,7 @@ ACCEPT_ENCODINGS = [
     "gzip, deflate, br",
     "gzip, deflate",
 ]
+
 
 def get_random_headers():
     return {
@@ -63,6 +64,7 @@ def get_random_headers():
         "Sec-Fetch-User": "?1",
         "Sec-Fetch-Dest": "document",
     }
+
 
 CHAT_ID = -1002308684118
 
@@ -248,33 +250,50 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not ad_data:
                 # Объявление совсем новое
                 print(f"[check_command] Новое объявление {ad_url}")
-                new_ads.append(ad_url)
                 ad_info = parse_ad_page(ad_url)
-                seen_ads[ad_url] = {
-                    "url": ad_url,
-                    "first_seen": now.isoformat(),
-                    "last_checked": now.isoformat(),
-                    "date_posted": ad_info["date_posted"],
-                    "updated_date": ad_info["updated_date"],
-                    "price": ad_info["price"],
-                }
+
+                if ad_info:  # Защита на случай если парсинг не удался
+                    new_ads.append(ad_url)
+                    seen_ads[ad_url] = {
+                        "url": ad_url,
+                        "first_seen": now.isoformat(),
+                        "last_checked": now.isoformat(),
+                        "date_posted": ad_info.get("date_posted"),
+                        "updated_date": ad_info.get("updated_date"),
+                        "price": ad_info.get("price"),
+                    }
+                else:
+                    print(f"[check_command] Ошибка парсинга нового объявления {ad_url}")
+
             else:
                 # Объявление уже есть в базе
                 last_checked = datetime.fromisoformat(ad_data["last_checked"])
                 if now - last_checked > timedelta(days=7):
                     print(f"[check_command] Проверяем старое объявление {ad_url}")
                     ad_info = parse_ad_page(ad_url)
-                    seen_ads[ad_url]["last_checked"] = now.isoformat()
 
-                    # Если дата обновления или цена изменилась
-                    if (
-                        (ad_info["updated_date"] and ad_info["updated_date"] != ad_data.get("updated_date"))
-                        or (ad_info["price"] and ad_info["price"] != ad_data.get("price"))
-                    ):
-                        print(f"[check_command] Объявление {ad_url} обновилось")
-                        seen_ads[ad_url]["updated_date"] = ad_info["updated_date"]
-                        seen_ads[ad_url]["price"] = ad_info["price"]
-                        updated_ads.append(ad_url)
+                    if ad_info:
+                        seen_ads[ad_url]["last_checked"] = now.isoformat()
+
+                        # Если дата обновления или цена изменилась
+                        if (
+                            ad_info.get("updated_date")
+                            and ad_info.get("updated_date")
+                            != ad_data.get("updated_date")
+                        ) or (
+                            ad_info.get("price")
+                            and ad_info.get("price") != ad_data.get("price")
+                        ):
+                            print(f"[check_command] Объявление {ad_url} обновилось")
+                            seen_ads[ad_url]["updated_date"] = ad_info.get(
+                                "updated_date"
+                            )
+                            seen_ads[ad_url]["price"] = ad_info.get("price")
+                            updated_ads.append(ad_url)
+                    else:
+                        print(
+                            f"[check_command] Ошибка парсинга старого объявления {ad_url}"
+                        )
 
         # Теперь формируем сообщения
         messages = []
@@ -313,6 +332,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         raise
 
 
+# ======= Форматирование сообщения =======
 def format_ad_message(ad_info, ad_type):
     # Проверяем наличие ключа 'url'
     url = ad_info.get(
