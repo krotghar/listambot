@@ -44,17 +44,11 @@ ACCEPT_LANGUAGES = [
     "en;q=0.8",
 ]
 
-ACCEPT_ENCODINGS = [
-    "gzip, deflate, br",
-    "gzip, deflate",
-]
-
 
 def get_random_headers():
     return {
         "User-Agent": random.choice(USER_AGENTS),
         "Accept-Language": random.choice(ACCEPT_LANGUAGES),
-        "Accept-Encoding": random.choice(ACCEPT_ENCODINGS),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1",
@@ -99,7 +93,7 @@ def fetch_ads():
             for a in soup.find_all("a", href=True):
                 href = a["href"]
                 if href.startswith("/item/"):
-                    links.append(f"https://www.list.am/ru/{href}")
+                    links.append(f"https://www.list.am/ru{href}")
 
             print(f"[fetch_ads] Найдено {len(links)} объявлений на странице")
             return list(set(links))
@@ -128,7 +122,6 @@ def parse_ad_page(url):
             footer = soup.find("div", class_="footer")
             if not footer:
                 print(f"[parse_ad_page] Не найден футер на странице {url}")
-                return None
 
             # Дата публикации
             date_posted = footer.find("span", itemprop="datePosted")
@@ -252,18 +245,15 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 print(f"[check_command] Новое объявление {ad_url}")
                 ad_info = parse_ad_page(ad_url)
 
-                if ad_info:  # Защита на случай если парсинг не удался
-                    new_ads.append(ad_url)
-                    seen_ads[ad_url] = {
-                        "url": ad_url,
-                        "first_seen": now.isoformat(),
-                        "last_checked": now.isoformat(),
-                        "date_posted": ad_info.get("date_posted"),
-                        "updated_date": ad_info.get("updated_date"),
-                        "price": ad_info.get("price"),
-                    }
-                else:
-                    print(f"[check_command] Ошибка парсинга нового объявления {ad_url}")
+                new_ads.append(ad_url)
+                seen_ads[ad_url] = {
+                    "url": ad_url,
+                    "first_seen": now.isoformat(),
+                    "last_checked": now.isoformat(),
+                    "date_posted": ad_info.get("date_posted", "Не указана"),
+                    "updated_date": ad_info.get("updated_date", "Не указана"),
+                    "price": ad_info.get("price", "Не указана"),
+                }
 
             else:
                 # Объявление уже есть в базе
@@ -285,10 +275,13 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             and ad_info.get("price") != ad_data.get("price")
                         ):
                             print(f"[check_command] Объявление {ad_url} обновилось")
-                            seen_ads[ad_url]["updated_date"] = ad_info.get(
-                                "updated_date"
-                            )
-                            seen_ads[ad_url]["price"] = ad_info.get("price")
+                            # Обновляем информацию
+                            if ad_info.get("updated_date"):
+                                seen_ads[ad_url]["updated_date"] = ad_info.get(
+                                    "updated_date"
+                                )
+                            if ad_info.get("price"):
+                                seen_ads[ad_url]["price"] = ad_info.get("price")
                             updated_ads.append(ad_url)
                     else:
                         print(
