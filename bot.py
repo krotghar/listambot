@@ -244,6 +244,11 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Объявление совсем новое
                 print(f"[check_command] Новое объявление {ad_url}")
                 ad_info = parse_ad_page(ad_url)
+                if ad_info is None:
+                    print(
+                        f"[check_command] Не удалось распарсить новое объявление {ad_url}"
+                    )
+                    continue
 
                 new_ads.append(ad_url)
                 seen_ads[ad_url] = {
@@ -258,7 +263,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 # Объявление уже есть в базе
                 last_checked = datetime.fromisoformat(ad_data["last_checked"])
-                if now - last_checked > timedelta(days=7):
+                if now - last_checked > timedelta(days=1):
                     print(f"[check_command] Проверяем старое объявление {ad_url}")
                     ad_info = parse_ad_page(ad_url)
 
@@ -287,6 +292,10 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         print(
                             f"[check_command] Ошибка парсинга старого объявления {ad_url}"
                         )
+
+        print(
+            f"[check_command] Всего новых: {len(new_ads)}, обновленных: {len(updated_ads)}"
+        )
 
         # Теперь формируем сообщения
         messages = []
