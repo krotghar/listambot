@@ -263,7 +263,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 # Объявление уже есть в базе
                 last_checked = datetime.fromisoformat(ad_data["last_checked"])
-                if now - last_checked > timedelta(days=1):
+                if now - last_checked > timedelta(hours=3):
                     print(f"[check_command] Проверяем старое объявление {ad_url}")
                     ad_info = parse_ad_page(ad_url)
 
