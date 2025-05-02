@@ -236,7 +236,6 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         now = datetime.utcnow()
 
         new_ads = []
-        updated_ads = []
 
         for ad_url in ads:
             ad_data = seen_ads.get(ad_url)
@@ -259,47 +258,9 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "updated_date": ad_info.get("updated_date", "Не указана"),
                     "price": ad_info.get("price", "Не указана"),
                 }
-
-            else:
-                # Объявление уже есть в базе
-                last_checked = datetime.fromisoformat(ad_data["last_checked"])
-                if now - last_checked > timedelta(hours=3):
-                    print(f"[check_command] Проверяем старое объявление {ad_url}")
-                    ad_info = parse_ad_page(ad_url)
-
-                    if ad_info:
-                        seen_ads[ad_url]["last_checked"] = now.isoformat()
-
-                        # Если дата обновления или цена изменилась
-                        if (
-                            ad_info.get("updated_date")
-                            and ad_info.get("updated_date")
-                            != ad_data.get("updated_date")
-                        ) or (
-                            ad_info.get("price")
-                            and ad_info.get("price") != ad_data.get("price")
-                        ):
-                            print(f"[check_command] Объявление {ad_url} обновилось")
-                            # Обновляем информацию
-                            if ad_info.get("updated_date"):
-                                seen_ads[ad_url]["updated_date"] = ad_info.get(
-                                    "updated_date"
-                                )
-                            if ad_info.get("price"):
-                                seen_ads[ad_url]["price"] = ad_info.get("price")
-                            updated_ads.append(ad_url)
-                    else:
-                        print(
-                            f"[check_command] Ошибка парсинга старого объявления {ad_url}"
-                        )
-
-        print(
-            f"[check_command] Всего новых: {len(new_ads)}, обновленных: {len(updated_ads)}"
-        )
-
+        
         # Теперь формируем сообщения
         messages = []
-
         for ad_url in new_ads:
             try:
                 ad_info = seen_ads[ad_url]
@@ -310,15 +271,6 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"[check_command] Ошибка при формировании сообщения для {ad_url}: {e}"
                 )
 
-        for ad_url in updated_ads:
-            try:
-                ad_info = seen_ads[ad_url]
-                message = format_ad_message(ad_info, "Обновленное объявление:")
-                messages.append(message)
-            except Exception as e:
-                print(
-                    f"[check_command] Ошибка при формировании сообщения для {ad_url}: {e}"
-                )
 
         # Группируем по 5 штук
         grouped_messages = [messages[i : i + 5] for i in range(0, len(messages), 5)]
