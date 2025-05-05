@@ -19,7 +19,9 @@ load_dotenv()
 
 # ======= Настройки =======
 TOKEN = os.getenv("BOT_TOKEN")
-URL = "https://www.list.am/category/56?n=8&cmtype=1&price1=&price2=320000&crc=0&_a5=0&_a39=0&_a40=0&_a85=0&_a73=0&_a3_1=&_a3_2=&_a4=0&_a37=0&_a36=0&_a11_1=&_a11_2=&_a41=0&_a78=0&_a38=0&_a74=0&_a75=0&_a77=0&_a68=0&_a69=1&gl=8&c=56&gl=0"
+URL = "https://www.list.am/category/56?n=8&cmtype=1&price1=&price2=350000&crc=0&_a5=0&_a39=0&_a40=0&_a85=0&_a73=0&_a3_1=&_a3_2=&_a4=0&_a37=0&_a36=0&_a11_1=&_a11_2=&_a41=0&_a78=0&_a38=0&_a74=0&_a75=0&_a77=0&_a68=0&_a69=1&gl=8&c=56&gl=0"
+URL_MAYBE_WITH_DOG = "https://www.list.am/category/56?n=8&cmtype=1&price1=&price2=350000&crc=0&_a5=0&_a39=0&_a40=0&_a85=0&_a73=0&_a3_1=&_a3_2=&_a4=2%2C3&_a37=0&_a36=0&_a11_1=&_a11_2=&_a41=2%2C3%2C4&_a78=0&_a38=5%2C6%2C7&_a74=0&_a75=0&_a77=0&_a68=0&_a69=3"
+
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
@@ -73,15 +75,15 @@ headers = {
 
 
 # ======= Парсер =======
-def fetch_ads():
+def fetch_ads(url):
     attempt = 0
     while True:
         try:
             dynamic_headers = get_random_headers()
             print(
-                f"[fetch_ads] Попытка {attempt + 1}: Делаем запрос к {URL} \nUser-Agent: {dynamic_headers['User-Agent']}"
+                f"[fetch_ads] Попытка {attempt + 1}: Делаем запрос к {url} \nUser-Agent: {dynamic_headers['User-Agent']}"
             )
-            response = requests.get(URL, headers=dynamic_headers, timeout=10)
+            response = requests.get(url, headers=dynamic_headers, timeout=10)
             response.raise_for_status()
 
             print(f"[fetch_ads] Ответ сервера: {response.status_code}")
@@ -231,9 +233,15 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"[check_command] Команда /check получена")
 
     try:
-        ads = fetch_ads()
+        ads = fetch_ads(URL)
+        maybe_dogs_ads = fetch_ads(URL_MAYBE_WITH_DOG)
         seen_ads = load_seen_ads()
         now = datetime.utcnow()
+        
+        # Объединяем списки объявлений
+        ads.extend(maybe_dogs_ads)
+        ads = list(set(ads))  # Убираем дубликаты
+        print(f"[check_command] Найдено {len(ads)} уникальных объявлений")
 
         new_ads = []
 
@@ -247,6 +255,19 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     print(
                         f"[check_command] Не удалось распарсить новое объявление {ad_url}"
                     )
+                    continue
+                
+                #  только если дата публикации позже 01.05.2025 
+                if ad_info.get("date_posted") and ad_info["date_posted"] < datetime(2025, 5, 1):
+                    print(f"[check_command] Пропускаем объявление {ad_url} с датой публикации {ad_info['date_posted']}")
+                    seen_ads[ad_url] = {
+                        "url": ad_url,
+                        "first_seen": now.isoformat(),
+                        "last_checked": now.isoformat(),
+                        "date_posted": ad_info.get("date_posted", "Не указана"),
+                        "updated_date": ad_info.get("updated_date", "Не указана"),
+                        "price": ad_info.get("price", "Не указана"),
+                    }
                     continue
 
                 new_ads.append(ad_url)
